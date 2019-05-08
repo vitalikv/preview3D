@@ -32,7 +32,7 @@
 	var libs = '92da6c1f72c1ebca456a86d978af1dfc7db1bcb24d658d710c5c8ae25d98ba52';  
 	//var libs = 'fb5f95f84fa11b73e0ebfa0969de65176902c1b7337652d43537a66a09d7028d';
 	
-	loadPopObj_1( { lotid : 25 } );      
+	//loadPopObj_1( { lotid : 154902 } );      
     </script>	
 </body>
 

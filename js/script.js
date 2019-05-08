@@ -94,7 +94,7 @@ var arrPop = [];
 //----------- start
 
 
-
+document.body.addEventListener('contextmenu', function(event) { event.preventDefault() });
 document.body.addEventListener( 'mousedown', onDocumentMouseDown, false );
 document.body.addEventListener( 'mousemove', onDocumentMouseMove, false );
 document.body.addEventListener( 'mouseup', onDocumentMouseUp, false );

@@ -289,6 +289,10 @@ function loadPopObj_2(cdm)
 			{
 				replaceHabdleDoor_2(cdm[n], json[i]);  
 			}
+			else
+			{
+				loaderObjPop(cdm[n], json[i]);
+			}
 		} 
 		else if(json[i].type == 'material')
 		{		
