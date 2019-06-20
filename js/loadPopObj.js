@@ -87,18 +87,29 @@ function createEmptyCube(json)
 		var material = new THREE.MeshLambertMaterial({ color: colWin, transparent: true, opacity: 0.5, side: THREE.DoubleSide }); 
 		var cube = new THREE.Mesh( createGeometryCube(json.size.x, json.size.y, json.size.z), material ); 			
 		
-		if(1==1)
+		if(1==2) 
 		{
-			var arr = json.modifiers.split(';');			
+			var arr = json.allModifiers.split(';');			
 			for ( var i2 = 0; i2 < arr.length; i2++ ) 
 			{ 
 				if(arr[i2] == 'SnapToCeil') { cube.position.y = Number(height_wall); break; } 								// объекты крепятся потолку
-				if((/SetupBeginOverfloor/i).test( arr[i2] )) { cube.position.y = Number(arr[i2].split('*')[1]); break; }	// объекты крепятся на заданную высоту	
-			}			
+				
+				// объекты крепятся на заданную высоту	
+				if((/SetupBeginOverfloor/i).test( arr[i2] )) 
+				{ 
+					var num = arr[i2].split('*')[1]; 
+					num = num.replace(",", "."); 
+					if(Number(num)) { cube.position.y = Number(num); }
+					break; 
+				}	
+			}				
 		}
 		else
 		{
-			console.log(json);
+			// объекты крепятся к потолку
+			if(typeof json.allModifiers.SnapToCeil !== "undefined") { cube.position.y = Number(height_wall); }	
+			// объекты крепятся на заданную высоту
+			if(typeof json.allModifiers.SetupBeginOverfloor !== "undefined") { cube.position.y = Number(json.allModifiers.SetupBeginOverfloor[0]); }				
 		}
 
 		
@@ -131,59 +142,81 @@ function createEmptyFormWD(json, cdm)
 		var material = new THREE.MeshLambertMaterial({ color: (json.lotGroup == 'Windows') ? colWin : colDoor, transparent: true, opacity: 0.0, depthTest: true });  
 						
 
-		var arr = json.modifiers.split(';'); 
-		
-		//console.log(json.allModifiers);
-		
-		if(typeof json.allModifiers.CutContourData !== "undefined") { /*console.log(json.allModifiers.CutContourData[0]);*/ } 
-		
-
-
-		for ( var i = 0; i < arr.length; i++ ) 
-		{ 
-			if((/CutContourData*/i).test( arr[i] )) 
+		if(json.allModifiers.CutContourData)
+		{
+			var str = json.allModifiers.CutContourData[0].split('|');				
+			
+			var spline = [];
+			for ( var i2 = 0; i2 < str.length; i2+=2 ) { spline[spline.length] = new THREE.Vector2( parseFloat(str[i2]), parseFloat(str[i2 + 1]) ); }
+			
+			// балконная дверь (переворачиваем форму проема)
+			if(cdm.lotid == 13)
+			{					
+				for ( var i = 0; i < spline.length; i++ ) { spline[i].x *= -1; }
+			}				
+			
+			var shape = new THREE.Shape( spline );
+			var obj = new THREE.Mesh( new THREE.ExtrudeGeometry( shape, { bevelEnabled: false, depth: 0.2 } ), material );
+			
+			var v = obj.geometry.vertices;
+			
+			var minX = [], maxX = [], minY = [], maxY = [], minZ = [], maxZ = [];
+			
+			for ( var i = 0; i < v.length; i++ )
 			{
-				var str = arr[i].split('CutContourData*')[1].split('|');				
-				
-				var spline = [];
-				for ( var i2 = 0; i2 < str.length; i2+=2 ) { spline[spline.length] = new THREE.Vector2( parseFloat(str[i2]), parseFloat(str[i2 + 1]) ); }
-				
-				var shape = new THREE.Shape( spline );
-				var obj = new THREE.Mesh( new THREE.ExtrudeGeometry( shape, { bevelEnabled: false, amount: 0.2 } ), material );
-				
-				var v = obj.geometry.vertices;
-				
-				var minX = [], maxX = [], minY = [], maxY = [], minZ = [], maxZ = [];
-				
-				for ( var i = 0; i < v.length; i++ )
-				{
-					v[i].z = Math.round(v[i].z * 100) / 100;
-					if(v[i].z == 0) { minZ[minZ.length] = i; v[i].z = -0.1; }
-					if(v[i].z == 0.2) { maxZ[maxZ.length] = i; v[i].z = 0.1; } 
-				}
-				
-				obj.geometry.verticesNeedUpdate = true; 
-				obj.geometry.elementsNeedUpdate = true;
-				obj.geometry.computeBoundingSphere();
-				obj.geometry.computeBoundingBox();
-				obj.geometry.computeFaceNormals();	
+				v[i].z = Math.round(v[i].z * 100) / 100;
+				if(v[i].z == 0) { minZ[minZ.length] = i; v[i].z = -0.1; }
+				if(v[i].z == 0.2) { maxZ[maxZ.length] = i; v[i].z = 0.1; } 
+			}
+			
+			obj.geometry.computeBoundingBox();	
 
-				for ( var i = 0; i < v.length; i++ )
-				{
-					if(obj.geometry.boundingBox.min.x + 0.05 > v[i].x) { minX[minX.length] = i; }
-					if(obj.geometry.boundingBox.max.x - 0.05 < v[i].x) { maxX[maxX.length] = i; }
-					if(obj.geometry.boundingBox.min.y + 0.05 > v[i].y) { minY[minY.length] = i; }
-					if(obj.geometry.boundingBox.max.y - 0.05 < v[i].y) { maxY[maxY.length] = i; }
-				}
+			for ( var i = 0; i < v.length; i++ )
+			{
+				if(obj.geometry.boundingBox.min.x + 0.05 > v[i].x) { minX[minX.length] = i; }
+				if(obj.geometry.boundingBox.max.x - 0.05 < v[i].x) { maxX[maxX.length] = i; }
+				if(obj.geometry.boundingBox.min.y + 0.05 > v[i].y) { minY[minY.length] = i; }
+				if(obj.geometry.boundingBox.max.y - 0.05 < v[i].y) { maxY[maxY.length] = i; }
+			}				
+			
+			var arr = { minX : minX, maxX : maxX, minY : minY, maxY : maxY, minZ : minZ, maxZ : maxZ };
+			
+			
+			form = { type : 'spline' , v : arr };
+			//form.type = '';
+			
+			// scale для формы двери
+			if(cdm.size)
+			{
+				var scale = new THREE.Vector3(cdm.size.x/json.size.x, cdm.size.y/json.size.y, cdm.size.z/json.size.z); 	
+				var v = obj.geometry.vertices; 
+				var f = form.v;
 				
+				for ( var i = 0; i < f.minX.length; i++ ) { v[f.minX[i]].x *= scale.x; }
+				for ( var i = 0; i < f.maxX.length; i++ ) { v[f.maxX[i]].x *= scale.x; }
+				for ( var i = 0; i < f.minY.length; i++ ) { v[f.minY[i]].y *= scale.y; }
+				for ( var i = 0; i < f.maxY.length; i++ ) { v[f.maxY[i]].y *= scale.y; }
+
+
+				obj.geometry.verticesNeedUpdate = true;
+				obj.geometry.elementsNeedUpdate = true;	
+				obj.geometry.computeBoundingSphere();						
+			}
+			
+			if(cdm.lotid == 575) 
+			{
+				// подгоняем под нужный размер, вместо scale
+				var v = obj.geometry.vertices; 
+				var f = form.v;
 				
-				var arr = { minX : minX, maxX : maxX, minY : minY, maxY : maxY, minZ : minZ, maxZ : maxZ };
-				
-				form = { type : 'spline' , v : arr };
-				//form.type = '';
-				
-				break;
-			}					
+				for ( var i = 0; i < f.minX.length; i++ ) { v[f.minX[i]].x = -size.x / 2; }
+				for ( var i = 0; i < f.maxX.length; i++ ) { v[f.maxX[i]].x = size.x / 2; }
+				for ( var i = 0; i < f.minY.length; i++ ) { v[f.minY[i]].y = -size.y / 2; }
+				for ( var i = 0; i < f.maxY.length; i++ ) { v[f.maxY[i]].y = size.y / 2; }
+
+				obj.geometry.verticesNeedUpdate = true;
+				obj.geometry.elementsNeedUpdate = true;				
+			}
 		}		
 		
 		if(form.type == '')
@@ -315,19 +348,20 @@ function loaderObjPop(cdm, json)
 	var rot = (cdm.rot) ? new THREE.Vector3(Number(cdm.rot.x), Number(cdm.rot.y), Number(cdm.rot.z)) : new THREE.Vector3();
 					
 	
-	var mod = json.modifiers.split(';');
-	
 	if(!cdm.id)
 	{
 		offset = new THREE.Vector3();
 		
-										
-		for ( var i2 = 0; i2 < mod.length; i2++ ) 
+
+		if(typeof json.allModifiers.SnapToCeil !== "undefined") { parO.pos.y = Number(height_wall); }	// объекты крепятся к потолку	
+		
+		// объекты крепятся на заданную высоту	
+		if(typeof json.allModifiers.SetupBeginOverfloor !== "undefined") 
 		{ 
-			if(mod[i2] == 'SnapToCeil') { pos.y = Number(height_wall); break; } 							// объекты крепятся к потолку
-			if((/SetupBeginOverfloor/i).test( mod[i2] )) { pos.y = Number(mod[i2].split('*')[1]); break; }	// объекты крепятся на заданную высоту	
-		}
-	
+			var num = json.allModifiers.SetupBeginOverfloor[0];
+			num = num.replace(",", ".");
+			if(Number(num)) { parO.pos.y = Number(num); }
+		}	
 		
 		parO.pos.y = pos.y;
 		pos.copy( parO.pos ); 									
@@ -354,10 +388,6 @@ function loaderObjPop(cdm, json)
 	
 	var box = null;
 	
-	for ( var i2 = 0; i2 < mod.length; i2++ ) 
-	{ 
-		//if((/ResizeOption/i).test( mod[i2] )) { box = boxPop; break; }	// объекту можно менять высоту/ширину/длину
-	}	
 	
 	//obj3D.userData.obj3D.boxPop = box; 
 	obj3D.userData.obj3D.controller = 'pivot'; 
@@ -418,7 +448,7 @@ function loaderWD(cdm, json)
 	var obj = cdm.emptyBox;
 
 	obj.userData.door.lotid = json.id;
-	obj.userData.door.type = (json.lotGroup == 'Windows') ? 'WindowSimply' : ((/DoorPattern*/i).test( json.modifiers )) ? 'DoorPattern' : 'DoorSimply';
+	obj.userData.door.type = (json.lotGroup == 'Windows') ? 'WindowSimply' : ((/DoorPattern*/i).test(json.allModifiers.DoorPattern)) ? 'DoorPattern' : 'DoorSimply';
 	
 	obj.caption = json.caption;
 	obj.pr_catalog = Object.assign({}, cdm.catalog);
@@ -452,8 +482,6 @@ function loaderWD(cdm, json)
 			}
 		}		
 		
-		//var arr = json.modifiers.split(';');
-		//for ( var i = 0; i < arr.length; i++ ) { if((/Mirrored/i).test( arr[i] )) { size.x *= -1; } }
 		
 		var existObj = (obj.userData.door.popObj) ? (obj.userData.door.popObj.geometry) ? true : false : false;
 		

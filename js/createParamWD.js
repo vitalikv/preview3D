@@ -137,9 +137,6 @@ function createJambDoor(json, cdm)
 	
 	cdm.emptyBox.userData.door.compilation = {}; 
 	
-	var arr = json.modifiers.split(';');
-
-	
 	var pr_door = resetParamDoor();
 	pr_door.lotid = json.id;
 	pr_door.objWD = cdm.emptyBox;	
@@ -149,34 +146,35 @@ function createJambDoor(json, cdm)
 	
 	var notD = true;
 	
-	for ( var i = 0; i < arr.length; i++ ) { if((/AddPlatband/i).test( arr[i] )) { pr_door.platband.side = 'BothSide'; notD = false; break; } }
+	if(json.allModifiers.AddPlatband) { pr_door.platband.side = 'BothSide'; notD = false; }
 	
-	
-	for ( var i = 0; i < arr.length; i++ ) 			// 1
-	{		
-		if((/DoorPattern*/i).test( arr[i] ))
-		{
-			var doorPattern = JSON.parse( arr[i].split('DoorPattern*')[1] );
-			
-			var size = doorPattern.size.replace("(", "");
-			size = size.replace(")", "");
-			pr_door.size.z = Number(size.split(',')[2]);					// ширина полотна
-			
-			var pivot_rot = doorPattern.pivot_rot.replace("(", "");
-			pivot_rot = pivot_rot.replace(")", "");	
-			var sc2 = pivot_rot.split(',');			// точка вращения двери (pivot_rot)
-			
-			
-			if(doorPattern.frameProfileType) { pr_door.box = doorPattern.frameProfileType; }			
-			if(doorPattern.platbandLocation) { pr_door.platband.side = doorPattern.platbandLocation; notD = false; }
-			if(doorPattern.addDoorstep) { pr_door.step = doorPattern.addDoorstep; }
-		}
-		else if((/ReplaceableElement*/i).test( arr[i] ))
-		{
-			var repl = JSON.parse( arr[i].split('ReplaceableElement*')[1] );
-			if(repl.type == 'Platband') { pr_door.platband.side = 'BothSide'; notD = false; }			
-		}
+	if(json.allModifiers.DoorPattern) 
+	{
+		var doorPattern = JSON.parse( json.allModifiers.DoorPattern[0] );
+		
+		var size = doorPattern.size.replace("(", "");
+		size = size.replace(")", "");
+		pr_door.size.z = Number(size.split(',')[2]);					// ширина полотна
+		
+		var pivot_rot = doorPattern.pivot_rot.replace("(", "");
+		pivot_rot = pivot_rot.replace(")", "");	
+		var sc2 = pivot_rot.split(',');			// точка вращения двери (pivot_rot)
+		
+		
+		if(doorPattern.frameProfileType) { pr_door.box = doorPattern.frameProfileType; }			
+		if(doorPattern.platbandLocation) { pr_door.platband.side = doorPattern.platbandLocation; notD = false; }
+		if(doorPattern.addDoorstep) { pr_door.step = doorPattern.addDoorstep; }		
 	}
+	
+	if(json.allModifiers.ReplaceableElement) 
+	{
+		for(var i = 0; i < json.allModifiers.ReplaceableElement.length; i++)
+		{
+			var repl = JSON.parse( json.allModifiers.ReplaceableElement[i] );
+			if(repl.type == 'Platband') { pr_door.platband.side = 'BothSide'; notD = false; break; }					
+		}
+	}	
+	
 	
 	if(notD) { pr_door.platband.side = 'none'; objWD.userData.door.platband = 'none'; }	// нету наличников
 	
@@ -185,13 +183,13 @@ function createJambDoor(json, cdm)
 	// 6
 	var arrJ = [];
 	
-	for ( var i = 0; i < arr.length; i++ ) 
-	{		
-		if((/ReplaceableElement*/i).test( arr[i] )) 
-		{ 
-			arrJ[arrJ.length] = JSON.parse( arr[i].split('ReplaceableElement*')[1] ); 			
+	if(json.allModifiers.ReplaceableElement)
+	{
+		for(var i = 0; i < json.allModifiers.ReplaceableElement.length; i++) 
+		{
+			arrJ[arrJ.length] = JSON.parse( json.allModifiers.ReplaceableElement[i] );
 		}
-	}
+	}	
 	
 	
 	if(cdm.options)
@@ -208,11 +206,9 @@ function createJambDoor(json, cdm)
 				for ( var i2 = 0; i2 < arrJ.length; i2++ ) 
 				{
 					if(str[0] == arrJ[i2].dumName) { arrJ[i2].default = Number(str[1]); }
-				}
-				
+				}				
 			}
-		}
-		
+		}		
 	}
 	
 	
@@ -227,7 +223,8 @@ function createJambDoor(json, cdm)
 		if(isNumeric(arrJ[i].default)) { arrLotid[arrLotid.length] = arrJ[i].default;  }
 	}	
 	
-	loadPopObj_XML_1({ arrLotid : arrLotid, listId : arrLotid, mess : 'DoorPattern', arrJ : arrJ, pr_door : pr_door });		// загружаем все ПОП объекты+текстуры параметрической двери		
+	//addJsonPopBase_1({ arrLotid : arrLotid, listId : arrLotid, mess : 'DoorPattern', arrJ : arrJ, pr_door : pr_door });		// загружаем все ПОП объекты+текстуры параметрической двери	
+	parseJsonDoorCompile2({ arrLotid : arrLotid, listId : arrLotid, mess : 'DoorPattern', arrJ : arrJ, pr_door : pr_door });
 }
 
 
@@ -246,8 +243,15 @@ function parseJsonDoorCompile2( cdm )
 		for ( var i2 = 0; i2 < pool_pop.length; i2++ )
 		{
 			if(arrLotid[i] == pool_pop[i2].id) 
-			{
-				var obj = new THREE.ObjectLoader().parse( pool_pop[i2].fileJson );
+			{ 				
+				try 
+				{	
+					var obj = new THREE.ObjectLoader().parse( pool_pop[i2].fileJson );
+				} 
+				catch (err) 
+				{
+					var obj = { userData : {} };
+				}			
 				
 				var dumName = '';
 				for ( var i3 = 0; i3 < arrJ.length; i3++ )
@@ -272,43 +276,6 @@ function parseJsonDoorCompile2( cdm )
 }
 
 
-// получаем инфу по всем составным деталям параметрической двери 
-function loadPopDoorPattern(arrJ, pr_door)
-{
-	var n = 0;
-	var list = '';
-	for ( var i = 0; i < arrJ.length; i++ ) 
-	{ 
-		//if(arrJ[i].default == 13769) { arrJ[i].default = 12761; } 
-		if(isNumeric(arrJ[i].default)) { list += '&id['+n+']=' + arrJ[i].default; n++; }
-	}
-	
-	var arrObjs = [];	 
-	 
-	$.ajax
-	({  
-		url: 'https://catalog.planoplan.com/api/v2/search/?keys[0]='+param_ugol.key+'&disregard_price=1&disregard_structure=1'+list+'&lang=ru',
-		type: 'GET', 
-		dataType: 'json',
-		success: function(json)
-		{ 
-			json = json.items;  
-			if(json.length == 0) { return; }		
-		
-			for ( var i = 0; i < json.length; i++ )
-			{
-				var size = json[i].size.split(',');   
-				json[i].size = new THREE.Vector3(size[0],size[1],size[2]);			
-				
-				parseJsonDoorCompile(json[i], arrObjs, pr_door, arrJ);
-			}							
-		}, 
-		error: function(json)
-		{
-			console.log('error', list);
-		}
-	});	
-}
 
 
 // ждем пока все объекты дверей вместе собирутся, отправляем на сборку
@@ -455,50 +422,50 @@ function compileParamDoor(arrObjs, pr_door)
 
 			assignTextureDoorParam(obj, obj.geometry.name, pr_door.material);
 
-			objWD.userData.door.compilation.doorLeaf = obj;		
+			objWD.userData.door.compilation.doorLeaf = obj;
+
+			obj.castShadow = true;	
+			obj.receiveShadow = true;			
 		}
 		else if(arrObjs[i].lotGroup == 'Platband')
 		{
 			pr_door.platband.standart = false;
 			
-			var arr = arrObjs[i].modifiers.split(';');
-			
-			for ( var i2 = 0; i2 < arr.length; i2++ ) 			
-			{		
-				if((/PlatbandProfile*/i).test( arr[i2] ))
+			if(arrObjs[i].allModifiers.PlatbandProfile)
+			{
+				var str = arrObjs[i].allModifiers.PlatbandProfile[0];
+				
+				var str = str.split('|');
+				
+				var spline = [];
+				for ( var i3 = 0; i3 < str.length; i3++ )
 				{
-					var str = arr[i2].split('PlatbandProfile*')[1];
-					
-					var str = str.split('|');
-					
-					var spline = [];
-					for ( var i3 = 0; i3 < str.length; i3++ )
-					{
-						var vert2 = str[i3].split(',');
-						spline[i3] = new THREE.Vector2( vert2[0], vert2[1] );
-					}
-					
-					pr_door.platband.form = spline;	
-					pr_door.platband.type = 'spline'; 
+					var vert2 = str[i3].split(',');
+					spline[i3] = new THREE.Vector2( vert2[0], vert2[1] );
 				}
-				else if((/PlatbandType*/i).test( arr[i2] ))
-				{
-					pr_door.platband.cut = arr[i2].split('PlatbandType*')[1];  
-				}
-				else if((/HoleSize*/i).test( arr[i2] ))
-				{
-					pr_door.platband.type = 'mesh';
-					pr_door.platband.mesh = arrObjs[i].obj;
-					
-					var str = arr[i2].split('HoleSize*')[1];
-					str = str.replace(")", "");
-					str = str.replace("(", ""); 
-					str = str.split(','); 
-
-					pr_door.platband.size = arrObjs[i].size;
-					pr_door.platband.holdSize = { x : parseFloat(str[0]), y : parseFloat(str[1]) };
-				}				
+				
+				pr_door.platband.form = spline;	
+				pr_door.platband.type = 'spline'; 				
 			}
+			
+			if(arrObjs[i].allModifiers.PlatbandType)
+			{
+				pr_door.platband.cut = arrObjs[i].allModifiers.PlatbandType[0];  
+			}			
+			
+			if(arrObjs[i].allModifiers.HoleSize)
+			{
+				pr_door.platband.type = 'mesh';
+				pr_door.platband.mesh = arrObjs[i].obj;
+				
+				var str = arrObjs[i].allModifiers.HoleSize[0];
+				str = str.replace(")", "");
+				str = str.replace("(", ""); 
+				str = str.split(','); 
+
+				pr_door.platband.size = arrObjs[i].size;
+				pr_door.platband.holdSize = { x : parseFloat(str[0]), y : parseFloat(str[1]) };
+			}	
 		} 
 	}
 	
@@ -633,7 +600,7 @@ function createDoorFrame(type, width, height, obj3D)
 function createJamb_1(cdm, shape, length, posX, posY)
 {
 	var material = new THREE.MeshLambertMaterial( { color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 } );   // depthTest: false
-	var obj = new THREE.Mesh( new THREE.ExtrudeGeometry( shape, { bevelEnabled: false, amount: length } ), material );
+	var obj = new THREE.Mesh( new THREE.ExtrudeGeometry( shape, { bevelEnabled: false, depth: length } ), material );
 	//obj.renderOrder = 1.8;
 	
 	var v = obj.geometry.vertices;
@@ -741,7 +708,7 @@ function createPlatband(shape, length)
 {
 	//color: 0xff4747
 	var material = new THREE.MeshLambertMaterial( { color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 } );   // depthTest: false
-	var obj = new THREE.Mesh( new THREE.ExtrudeGeometry( shape, { bevelEnabled: false, amount: length } ), material );
+	var obj = new THREE.Mesh( new THREE.ExtrudeGeometry( shape, { bevelEnabled: false, depth: length } ), material );
 	//obj.renderOrder = 1.8;
 	
 	var v = obj.geometry.vertices;
